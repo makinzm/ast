@@ -5,6 +5,8 @@
 # @Email   : yuangong@mit.edu
 # @File    : ast_models.py
 
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 from torch.cuda.amp import autocast
@@ -113,16 +115,24 @@ class ASTModel(nn.Module):
 
         # now load a model that is pretrained on both ImageNet and AudioSet
         elif audioset_pretrain == True:
+            ast_models_dir = Path(__file__).resolve().parent  #  .../ast/src/models
+            ast_src_dir = ast_models_dir.parent               #  .../ast/src
+            ast_dir = ast_src_dir.parent                      #  .../ast
+            pretrained_dir = ast_dir / "pretrained_models"    #  .../ast/pretrained_models
+
+            local_model_path = pretrained_dir / "audioset_10_10_0.4593.pth"
+        
             if audioset_pretrain == True and imagenet_pretrain == False:
                 raise ValueError('currently model pretrained on only audioset is not supported, please set imagenet_pretrain = True to use audioset pretrained model.')
             if model_size != 'base384':
                 raise ValueError('currently only has base384 AudioSet pretrained model.')
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            if os.path.exists('../../pretrained_models/audioset_10_10_0.4593.pth') == False:
+            if os.path.exists(local_model_path) == False:
                 # this model performs 0.4593 mAP on the audioset eval set
                 audioset_mdl_url = 'https://www.dropbox.com/s/cv4knew8mvbrnvq/audioset_0.4593.pth?dl=1'
-                wget.download(audioset_mdl_url, out='../../pretrained_models/audioset_10_10_0.4593.pth')
-            sd = torch.load('../../pretrained_models/audioset_10_10_0.4593.pth', map_location=device)
+                wget.download(audioset_mdl_url, out=local_model_path)
+
+            sd = torch.load(local_model_path, map_location=device)
             audio_model = ASTModel(label_dim=527, fstride=10, tstride=10, input_fdim=128, input_tdim=1024, imagenet_pretrain=False, audioset_pretrain=False, model_size='base384', verbose=False)
             audio_model = torch.nn.DataParallel(audio_model)
             audio_model.load_state_dict(sd, strict=False)
